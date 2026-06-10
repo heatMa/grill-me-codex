@@ -2,19 +2,20 @@
 name: claude-review
 description: >-
   A Codex-primary adversarial PLAN-review loop where OpenAI Codex is the
-  builder/orchestrator and Claude Code is the read-only critic. Use this when
+  builder/orchestrator and Claude Code is the critic. Use this when
   you are working in Codex, already have a plan or clear idea, and want Claude
   Code to stress-test the plan before implementation. Codex writes and revises
-  a run-scoped PLAN.md, invokes Claude Code with only the Read tool, captures
-  Claude's session_id from JSON output, resumes that exact Claude session
-  across review rounds, and stops on VERDICT: APPROVED, VERDICT: REVISE plus
-  MAX_ROUNDS, or unresolved reviewer failure. NOT for Claude-primary review;
-  use /codex-review for Claude Code calling Codex.
+  a run-scoped PLAN.md, invokes Claude Code with its normal tool access for a
+  high-quality review, captures Claude's session_id from JSON output, resumes
+  that exact Claude session across review rounds, and stops on VERDICT:
+  APPROVED, VERDICT: REVISE plus MAX_ROUNDS, or unresolved reviewer failure.
+  NOT for Claude-primary review; use /codex-review for Claude Code calling
+  Codex.
 ---
 
 # Claude-Review - Codex-Primary Plan Review
 
-Codex is the builder and orchestrator. Claude Code is the read-only critic.
+Codex is the builder and orchestrator. Claude Code is the critic.
 This is the inverse of `codex-review`: **Codex calls Claude**, not the other way around.
 
 Use this when you are already working in Codex, have a plan or clear implementation idea, and want a second-model adversarial review before writing code. Skip it for trivial changes.
@@ -126,13 +127,12 @@ _Round 0 - initial draft by Codex_
 
 ### Step 1 - Round 1 Creates the Claude Session
 
-Invoke Claude with only the `Read` tool:
+Invoke Claude with its normal tool access:
 
 ```bash
 claude -p \
   --output-format json \
   --permission-mode plan \
-  --tools Read \
   "<round 1 review prompt>"
 ```
 
@@ -171,7 +171,6 @@ claude -p \
   --resume "$CLAUDE_SESSION_ID" \
   --output-format json \
   --permission-mode plan \
-  --tools Read \
   "<follow-up review prompt>"
 ```
 
@@ -180,7 +179,8 @@ Hard rules:
 - Never use `claude --continue`.
 - Never use `claude --resume` without an explicit id.
 - Never share a Claude session id across runs.
-- Do not let Claude write files, edit files, run shell commands, commit code, or mutate state.
+- Claude may inspect the repository and run checks as needed for review quality.
+- Claude should not implement the plan; Codex remains responsible for plan revisions and code changes.
 
 Claude session memory provides multi-round continuity. Run-local artifacts remain the authority and recovery point.
 
@@ -191,9 +191,11 @@ Each Claude prompt must be self-contained enough to recover from stale memory an
 ```text
 You are an adversarial reviewer for an implementation plan.
 
-Codex is the builder/orchestrator. You are the read-only critic.
-You may use only the Read tool. Do not write files, edit files, run shell commands,
-commit code, or mutate state.
+Codex is the builder/orchestrator. You are the critic.
+Use the tools you need to inspect the repository and validate the plan. Your job
+is to produce a high-quality review, not to implement the plan. Do not make
+source changes unless Codex explicitly asks for implementation after the review
+loop has completed.
 
 Repo root: <absolute repo root>
 Run root: <absolute RUN_ROOT>
@@ -286,6 +288,6 @@ The optional workspace context cache may be shared only by copying it into a run
 ## What Not To Do
 
 - Do not use this from Claude Code as a Claude-primary skill. Use `codex-review` for that direction.
-- Do not give Claude `Bash`, `Edit`, `Write`, or broad tool access.
+- Do not restrict Claude to `Read` only; high-quality review needs normal exploration tools.
 - Do not use `--continue` or resume the "latest" session.
 - Do not store run artifacts in root-level `PLAN.md` unless the user explicitly wants a committed/exported plan.

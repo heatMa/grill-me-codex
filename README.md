@@ -23,7 +23,7 @@ Built on [Matt Pocock's `grill-me` / `grill-with-docs`](https://github.com/mattp
 Direction matters:
 
 - **`codex-review`** is Claude-primary: Claude Code writes/revises the plan and calls Codex as the read-only critic.
-- **`claude-review`** is Codex-primary: Codex writes/revises the plan and calls Claude Code as the read-only critic.
+- **`claude-review`** is Codex-primary: Codex writes/revises the plan and calls Claude Code as the critic.
 
 ## How the Claude-primary Act 2 works
 
@@ -37,7 +37,7 @@ Two artifacts: `PLAN.md` (the clean final plan — the *what*) and `PLAN-REVIEW-
 
 ## How `claude-review` works
 
-`claude-review` flips the direction. Codex writes the plan into a run-scoped `.grill-codex/runs/<run_id>/PLAN.md`, invokes Claude Code with `claude -p --output-format json --permission-mode plan --tools Read`, captures Claude's `session_id`, and resumes only that explicit session on later rounds. Claude can read files but cannot write, edit, run shell commands, or mutate state.
+`claude-review` flips the direction. Codex writes the plan into a run-scoped `.grill-codex/runs/<run_id>/PLAN.md`, invokes Claude Code with `claude -p --output-format json --permission-mode plan`, captures Claude's `session_id`, and resumes only that explicit session on later rounds. Claude can use its normal tools to inspect the repository and produce a higher-quality review; Codex remains responsible for revising the plan and implementing code.
 
 Run artifacts live under `.grill-codex/` and are ephemeral by default. If you want to commit a final plan, export it intentionally to a tracked path.
 
@@ -55,14 +55,14 @@ Copy-Item -Recurse skills\* $env:USERPROFILE\.claude\skills\
 
 Then invoke the Claude-primary workflows in Claude Code: `/grill-me-codex`, `/grill-with-docs-codex`, or `/codex-review`.
 
-`claude-review` is the inverse workflow for Codex-primary sessions. When working in Codex, follow `skills/claude-review/SKILL.md`; Codex writes/revises the plan and invokes Claude Code as the read-only critic.
+`claude-review` is the inverse workflow for Codex-primary sessions. When working in Codex, follow `skills/claude-review/SKILL.md`; Codex writes/revises the plan and invokes Claude Code as the critic.
 
 ## Prerequisites
 
 - **Codex CLI ≥ 0.130** — `npm install -g @openai/codex@latest` (older versions error on the default `gpt-5.5` model).
 - **Authenticated Codex** — run `codex login` once (a ChatGPT account works; Free/Plus/Pro/Max all fine).
 - **Don't pin a model** — ChatGPT-account auth rejects `gpt-5.x-codex` model variants; the skills use your config default.
-- **Claude Code authenticated** — required only for `claude-review`; it invokes `claude -p --output-format json --permission-mode plan --tools Read`.
+- **Claude Code authenticated** — required only for `claude-review`; it invokes `claude -p --output-format json --permission-mode plan`.
 
 ## Tunables
 
@@ -78,7 +78,7 @@ Pass e.g. `rounds=3` when invoking to override.
 
 Codex runs **read-only every round** — `-s read-only` on the first call, `-c sandbox_mode="read-only"` on every resume (the `resume` subcommand doesn't accept `-s`, and without forcing read-only it would inherit your `config.toml` sandbox default, which may be `danger-full-access`). The skills handle this for you. No code is ever written until you approve the final plan.
 
-For `claude-review`, Claude Code is constrained to the `Read` tool only. Codex stores run-scoped artifacts under `.grill-codex/runs/<run_id>/` and captures Claude's explicit `session_id` on round 1, then resumes only that session in later rounds. `.grill-codex/` is ephemeral by default; export a final plan to a tracked path only when you intentionally want to commit it.
+For `claude-review`, Claude Code uses its normal tool access for review quality. Codex stores run-scoped artifacts under `.grill-codex/runs/<run_id>/` and captures Claude's explicit `session_id` on round 1, then resumes only that session in later rounds. `.grill-codex/` is ephemeral by default; export a final plan to a tracked path only when you intentionally want to commit it.
 
 ## Credits
 
